@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "photon-javascript-sdk_v4-1-1-0": "^1.0.0",
+    "three": "^0.155.0",
+    "ws": "^8.13.0"
+  },
+  "devDependencies": {
+    "vite": "^4.4.9"
+  }
+}
