@@ -4,7 +4,9 @@ import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 
 const ws = new WebSocket('ws://localhost:8080/');
+console.log(ws.readyState); 
 
+const uid = generateRandomString()
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer();
@@ -95,24 +97,33 @@ function animate() {
     requestAnimationFrame(animate);
     renderer.render(scene, camera);
     updateCameraPosition();
+
     // Send position and rotation to Unity if the object's properties change
     if (!camera.position.equals(position) && !camera.rotation.equals(rotation)) {
         position.copy(camera.position);
         rotation.copy(camera.rotation);
         // console.log(rotation);
         sendPositionAndRotationToUnity(camera);
+        console.log(uid);
     }
 }
 
 // Function to send position and rotation data to Unity
 function sendPositionAndRotationToUnity(object) {
     const objectData = {
-        position: object.position,
-        rotation: {
-            x: THREE.MathUtils.radToDeg(object.rotation.x),
-            y: THREE.MathUtils.radToDeg(object.rotation.y),
-            z: THREE.MathUtils.radToDeg(object.rotation.z)
+        header: {
+            type:"transforms",
+            id: uid
+        },
+        transformData:{
+            position: object.position,
+            rotation: {
+                x: THREE.MathUtils.radToDeg(object.rotation.x),
+                y: THREE.MathUtils.radToDeg(object.rotation.y),
+                z: THREE.MathUtils.radToDeg(object.rotation.z)
+            }
         }
+        
     };
     const jsonObjectData = JSON.stringify(objectData);
     if (ws.readyState === WebSocket.OPEN) {
@@ -132,13 +143,20 @@ ws.addEventListener("close", () => {
 // Function to close the WebSocket connection
 function closeWebSocketConnection() {
     if (ws.readyState === WebSocket.OPEN) {
-        ws.send("close");
+        // ws.send("close");
         ws.close();
     }
 }
 
 // Add an event listener for the "beforeunload" event
 window.addEventListener("beforeunload", () => {
+    const clientTypeMessage = {
+        header: {
+            type:"webgl disconnected",
+            id: uid
+        },
+    };
+    ws.send(JSON.stringify(clientTypeMessage));
     closeWebSocketConnection();
 });
 
@@ -147,11 +165,25 @@ const isWebGLClient = true;
 // When the WebSocket connection is opened
 ws.addEventListener('open', () => {
     const clientTypeMessage = {
-        type: 'webgl',
-        isWebGLClient: isWebGLClient
+        header: {
+            type:"webgl connected",
+            id: uid
+        },
     };
     ws.send(JSON.stringify(clientTypeMessage));
 });
+
+function generateRandomString() {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+  
+    for (let i = 0; i < 6; i++) {
+      const randomIndex = Math.floor(Math.random() * characters.length);
+      result += characters.charAt(randomIndex);
+    }
+  
+    return result;
+  }
 
 
 animate();
