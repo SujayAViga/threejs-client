@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
+// import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
+import {PointerLockControls} from 'three/examples/jsm/controls/PointerLockControls';
 
 const ws = new WebSocket('ws://localhost:8080/');
 console.log(ws.readyState); 
-
 const uid = generateRandomString()
+
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer();
@@ -30,7 +31,7 @@ function createObject() {
 }
 
 // Create an OrbitControls instance for camera manipulation
-const controls = new OrbitControls(camera, renderer.domElement);
+// const controls = new OrbitControls(camera, renderer.domElement);
 
 // Create a GUI for interactive controls
 const gui = new GUI();
@@ -41,9 +42,9 @@ addObjectToScene(selectedObject);
 objectFolder.add(selectedObject.position, 'x', -10, 10);
 objectFolder.add(selectedObject.position, 'y', -10, 10);
 objectFolder.add(selectedObject.position, 'z', -10, 10);
-objectFolder.add(selectedObject.rotation, 'x', 0, 360);
-objectFolder.add(selectedObject.rotation, 'y', 0, 360);
-objectFolder.add(selectedObject.rotation, 'z', 0, 360);
+objectFolder.add(selectedObject.rotation, 'x', 0, 2*Math.PI);
+objectFolder.add(selectedObject.rotation, 'y', 0, 2*Math.PI);
+objectFolder.add(selectedObject.rotation, 'z', 0, 2*Math.PI);
 objectFolder.open();
 
 camera.position.z = 5;
@@ -51,61 +52,137 @@ const position = new THREE.Vector3(); // Store the last position
 const rotation = new THREE.Euler(); // Store the last rotation
 
 
-// camera movements
-// Define a movement speed for the camera
-const movementSpeed = 0.1;
+//FPS controller
+const FPScontrols = new PointerLockControls(camera,renderer.domElement);
+document.addEventListener('click',function(){FPScontrols.lock();})
+let moveForward = false;
+let moveBackward = false;
+let moveLeft = false;
+let moveRight = false;
+let canJump = false;
 
-// Create a boolean object to track key states
-const keys = {
-    KeyW: false,
-    KeyA: false,
-    KeyS: false,
-    KeyD: false
+let prevTime = performance.now();
+const velocity = new THREE.Vector3();
+const direction = new THREE.Vector3();
+
+const onKeyDown = function ( event ) {
+
+    switch ( event.code ) {
+
+        case 'ArrowUp':
+        case 'KeyW':
+            moveForward = true;
+            break;
+
+        case 'ArrowLeft':
+        case 'KeyA':
+            moveLeft = true;
+            break;
+
+        case 'ArrowDown':
+        case 'KeyS':
+            moveBackward = true;
+            break;
+
+        case 'ArrowRight':
+        case 'KeyD':
+            moveRight = true;
+            break;
+
+        case 'Space':
+            if ( canJump === true ) velocity.y += 350;
+            canJump = false;
+            break;
+
+    }
+
 };
 
-// Add event listeners for keydown and keyup events
-document.addEventListener('keydown', onKeyDown);
-document.addEventListener('keyup', onKeyUp);
+const onKeyUp = function ( event ) {
 
-function onKeyDown(event) {
-    keys[event.code] = true;
+    switch ( event.code ) {
+
+        case 'ArrowUp':
+        case 'KeyW':
+            moveForward = false;
+            break;
+
+        case 'ArrowLeft':
+        case 'KeyA':
+            moveLeft = false;
+            break;
+
+        case 'ArrowDown':
+        case 'KeyS':
+            moveBackward = false;
+            break;
+
+        case 'ArrowRight':
+        case 'KeyD':
+            moveRight = false;
+            break;
+
+    }
+
+};
+document.addEventListener( 'keydown', onKeyDown );
+document.addEventListener( 'keyup', onKeyUp );
+
+function updateFPSControls(){
+    const time = performance.now();
+    const delta = ( time - prevTime ) / 1000;
+
+	velocity.x -= velocity.x * 10.0 * delta;
+	velocity.z -= velocity.z * 10.0 * delta;
+
+	velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
+
+	direction.z = Number( moveForward ) - Number( moveBackward );
+	direction.x = Number( moveRight ) - Number( moveLeft );
+	direction.normalize(); // this ensures consistent movements in all directions
+
+	if ( moveForward || moveBackward ) velocity.z -= direction.z * 1000.0 * delta;//intial value 300
+	if ( moveLeft || moveRight ) velocity.x -= direction.x * 1000.0 * delta;//initial value 300
+
+    FPScontrols.moveRight( - velocity.x * delta );
+	FPScontrols.moveForward( - velocity.z * delta );
+    
+    prevTime = time;
 }
-
-function onKeyUp(event) {
-    keys[event.code] = false;
-}
-
-// Update the camera's position based on pressed keys
-function updateCameraPosition() {
-    if (keys.KeyW) {
-        camera.position.z -= movementSpeed;
-    }
-    if (keys.KeyA) {
-        camera.position.x -= movementSpeed;
-    }
-    if (keys.KeyS) {
-        camera.position.z += movementSpeed;
-    }
-    if (keys.KeyD) {
-        camera.position.x += movementSpeed;
-    }
-}
-
 
 // Animate the scene
 function animate() {
-    requestAnimationFrame(animate);
-    renderer.render(scene, camera);
-    updateCameraPosition();
+    // requestAnimationFrame(animate);
+    // updateFPSControls();
+    // renderer.render(scene, camera);
+    // // updateCameraPosition();
+
+    // // Send position and rotation to Unity if the object's properties change
+    // if (!camera.position.equals(position) && !camera.rotation.equals(rotation)) {
+    //     position.copy(camera.position);
+    //     rotation.copy(camera.rotation);
+    //     console.log(position);
+    //     sendPositionAndRotationToUnity(camera);
+    //     // console.log(uid);
+    // }
+
+    requestAnimationFrame( animate );
+    updateFPSControls();
+  
+	renderer.render( scene, camera );
+  // updateCameraPosition();
 
     // Send position and rotation to Unity if the object's properties change
-    if (!camera.position.equals(position) && !camera.rotation.equals(rotation)) {
+    // if (!camera.position.equals(position) && !camera.rotation.equals(rotation)) {
         position.copy(camera.position);
         rotation.copy(camera.rotation);
-        // console.log(rotation);
         sendPositionAndRotationToUnity(camera);
-        console.log(uid);
-    }
+        // console.log(objectData.transformData.rotation.x);
+    // }
+
+    
+//   console.log(renderer.info.render.calls);
+  renderer.info.reset()
 }
 
 // Function to send position and rotation data to Unity
@@ -118,13 +195,14 @@ function sendPositionAndRotationToUnity(object) {
         transformData:{
             position: object.position,
             rotation: {
-                x: THREE.MathUtils.radToDeg(object.rotation.x),
-                y: THREE.MathUtils.radToDeg(object.rotation.y),
-                z: THREE.MathUtils.radToDeg(object.rotation.z)
+                x: object.rotation.x,
+                y: object.rotation.y,
+                z: object.rotation.z
             }
         }
         
     };
+    console.log(objectData.transformData.rotation.x);
     const jsonObjectData = JSON.stringify(objectData);
     if (ws.readyState === WebSocket.OPEN) {
         ws.send(jsonObjectData);
