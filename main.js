@@ -183,24 +183,30 @@ function animate() {
     
 //   console.log(renderer.info.render.calls);
   renderer.info.reset()
+
+    
 }
 
 // Function to send position and rotation data to Unity
 function sendPositionAndRotationToUnity(object) {
+    // Convert Euler rotation to Quaternion
+    const quaternion = new THREE.Quaternion();
+    quaternion.setFromEuler(object.rotation);
+
     const objectData = {
         header: {
-            type:"transforms",
+            type: "transforms",
             id: uid
         },
-        transformData:{
+        transformData: {
             position: object.position,
             rotation: {
-                x: object.rotation.x,
-                y: object.rotation.y,
-                z: object.rotation.z
+                x: quaternion.x,
+                y: quaternion.y,
+                z: quaternion.z,
+                w: quaternion.w
             }
         }
-        
     };
     console.log(objectData.transformData.rotation.x);
     const jsonObjectData = JSON.stringify(objectData);
