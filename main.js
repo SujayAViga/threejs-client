@@ -1,56 +1,75 @@
 import * as THREE from 'three';
-import { TransformControls } from 'three/addons/controls/TransformControls.js';
-import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
-// import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import {PointerLockControls} from 'three/examples/jsm/controls/PointerLockControls';
 
+// socket code
 const ws = new WebSocket('ws://localhost:8080/');
 console.log(ws.readyState); 
 const uid = generateRandomString()
+// socket code
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+// const helper = new THREE.CameraHelper( camera );
+// scene.add( helper );
+
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
 
-const light = new THREE.AmbientLight(0x404040);
-scene.add(light);
 
-// Create a function that takes an object as a parameter and adds it to the scene
-function addObjectToScene(object) {
-    scene.add(object);
-}
+const light1 = new THREE.PointLight({ color: "white" }, 1);
+light1.position.set(0, 3, 2);
+light1.castShadow = true;
+light1.shadow.mapSize.width = 1024;
+light1.shadow.mapSize.height = 1024;
+light1.shadow.radius = 5;
+scene.add(light1);
 
-// Describe the object
-function createObject() {
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-    const object = new THREE.Mesh(geometry, material);
-    return object;
-}
+const cube = new THREE.BoxGeometry(1, 1, 1);
+const cubeMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+cubeMat.roughness = 0.4;
+const cubeMesh = new THREE.Mesh(cube, cubeMat);
+// cubeMesh.position.y = -0.5
+cubeMesh.castShadow = true;
+scene.add(cubeMesh);
 
-// Create an OrbitControls instance for camera manipulation
-// const controls = new OrbitControls(camera, renderer.domElement);
+const base = new THREE.PlaneGeometry(5, 5);
+const baseMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+baseMat.roughness = 0.4;
+const baseMesh = new THREE.Mesh(base, baseMat);
+baseMesh.receiveShadow = true;
+baseMesh.translateY(-1.0);
+baseMesh.rotateX(-Math.PI / 2);
 
-// Create a GUI for interactive controls
-const gui = new GUI();
-const objectFolder = gui.addFolder('Object');
-let selectedObject = createObject(); // Create an initial object
-addObjectToScene(selectedObject);
+scene.add(baseMesh);
 
-objectFolder.add(selectedObject.position, 'x', -10, 10);
-objectFolder.add(selectedObject.position, 'y', -10, 10);
-objectFolder.add(selectedObject.position, 'z', -10, 10);
-objectFolder.add(selectedObject.rotation, 'x', 0, 2*Math.PI);
-objectFolder.add(selectedObject.rotation, 'y', 0, 2*Math.PI);
-objectFolder.add(selectedObject.rotation, 'z', 0, 2*Math.PI);
-objectFolder.open();
+const pointLight1 = new THREE.PointLight('white',4,5,3);
+pointLight1.position.y = 0
+pointLight1.position.z = -2
+scene.add(pointLight1);
 
-camera.position.z = 5;
+const pointLight2 = new THREE.PointLight('white',4,5,3);
+pointLight1.position.y = 0
+pointLight1.position.z = 2
+scene.add(pointLight2);
+
+const pointLight3 = new THREE.PointLight('white',4,5,3);
+pointLight1.position.y = 0
+pointLight1.position.x = -2
+scene.add(pointLight3);
+
+
+
+
+
+
+// camera.position.z = 5;
+
+// socket code
 const position = new THREE.Vector3(); // Store the last position
 const rotation = new THREE.Euler(); // Store the last rotation
-
+// socket code
 
 //FPS controller
 const FPScontrols = new PointerLockControls(camera,renderer.domElement);
@@ -132,8 +151,8 @@ function updateFPSControls(){
     const time = performance.now();
     const delta = ( time - prevTime ) / 1000;
 
-	velocity.x -= velocity.x * 10.0 * delta;
-	velocity.z -= velocity.z * 10.0 * delta;
+	velocity.x -= velocity.x * 100.0 * delta;
+	velocity.z -= velocity.z * 100.0 * delta;
 
 	velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
 
@@ -152,41 +171,27 @@ function updateFPSControls(){
 
 // Animate the scene
 function animate() {
-    // requestAnimationFrame(animate);
-    // updateFPSControls();
-    // renderer.render(scene, camera);
-    // // updateCameraPosition();
-
-    // // Send position and rotation to Unity if the object's properties change
-    // if (!camera.position.equals(position) && !camera.rotation.equals(rotation)) {
-    //     position.copy(camera.position);
-    //     rotation.copy(camera.rotation);
-    //     console.log(position);
-    //     sendPositionAndRotationToUnity(camera);
-    //     // console.log(uid);
-    // }
-
     requestAnimationFrame( animate );
     updateFPSControls();
   
 	renderer.render( scene, camera );
-  // updateCameraPosition();
-
     // Send position and rotation to Unity if the object's properties change
+    
+    // socket code in animate
     // if (!camera.position.equals(position) && !camera.rotation.equals(rotation)) {
         position.copy(camera.position);
         rotation.copy(camera.rotation);
         sendPositionAndRotationToUnity(camera);
         // console.log(objectData.transformData.rotation.x);
     // }
+    // socket code in animate
 
-    
-//   console.log(renderer.info.render.calls);
   renderer.info.reset()
 
     
 }
 
+// socket code
 // Function to send position and rotation data to Unity
 function sendPositionAndRotationToUnity(object) {
     // Convert Euler rotation to Quaternion
@@ -203,12 +208,12 @@ function sendPositionAndRotationToUnity(object) {
             rotation: {
                 x: quaternion.x,
                 y: quaternion.y,
-                z: quaternion.z,
-                w: quaternion.w
+                z: -quaternion.z,
+                w: -quaternion.w
             }
         }
     };
-    console.log(objectData.transformData.rotation.x);
+    console.log(camera.rotation.x);
     const jsonObjectData = JSON.stringify(objectData);
     if (ws.readyState === WebSocket.OPEN) {
         ws.send(jsonObjectData);
@@ -269,5 +274,6 @@ function generateRandomString() {
     return result;
   }
 
+//   socket code
 
 animate();
